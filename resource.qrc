@@ -1,0 +1,15 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icon/dict.png</file>
+        <file>icon/practice.png</file>
+        <file>icon/trans.png</file>
+        <file>icon/volume.png</file>
+        <file>icon/icon.jpg</file>
+        <file>style.qss</file>
+        <file>icon/trans_selected.png</file>
+        <file>icon/dict_selected.png</file>
+        <file>icon/practice_selected.png</file>
+        <file>icon/favor.png</file>
+        <file>icon/favor_selected.png</file>
+    </qresource>
+</RCC>
