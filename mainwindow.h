@@ -18,19 +18,21 @@ public:
   MainWindow(QWidget *parent = nullptr);
   ~MainWindow();
 
-  QTimer * trans_timer;
-  QTimer * practice_timer;
-  NetworkSupport *networkObj;
-  QList<char> answer_list;
-  QList<char> my_answer_list;
-  QList<QString> question_list;
-  QList<QString> solution_list;
+  const int TOTAL_QUESTION_NUM=33;
+  enum req_type{TRANSLATE,PRACTICE} req;
 
-  int question_index;
+  NetworkSupport *networkObj;
+
+  QList<int> id_list;
+  QList<QString> question_list;
+  QList<QString> word_list;
+  QList<QChar> my_answer_list;
+  QList<QChar> solution_list;
+  QString difficulty;
 
 public slots:
-    void requestFail(QString str); //发送“失败信号”时，触发该方法
-    void requestSuccess(QString str);//发送“成功信号”时，触发该方法
+  void requestFail(QString str); //发送“失败信号”时，触发该方法
+  void requestSuccess(QString str);//发送“成功信号”时，触发该方法
 private:
   Ui::MainWindow *ui;
 };

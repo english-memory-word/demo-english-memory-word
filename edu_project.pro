@@ -19,11 +19,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
-    networksupport.cpp
+    networksupport.cpp \
+    regex.cpp
 
 HEADERS += \
     mainwindow.h \
-    networksupport.h
+    networksupport.h \
+    regex.h
 
 FORMS += \
     mainwindow.ui

@@ -14,12 +14,13 @@
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QNetworkAccessManager>
-#include <QTimer>
+#include <QTime>
 #include <QFileDialog>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "networksupport.h"
+#include "regex.h"
 
 MainWindow::MainWindow(QWidget *parent)
   : QMainWindow(parent)
@@ -41,9 +42,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->favorBtn->setIcon(QIcon(":/icon/favor.png"));
     ui->transInput->setPlainText("");
     ui->transResult->setText("");
+    ui->transSymbol->setText("");
+    ui->transReadingBtn->setHidden(true);
     networkObj->dataStr="";
-    trans_timer->stop();
-    practice_timer->stop();
   });
 
   //词典按钮
@@ -55,8 +56,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->transBtn->setIcon(QIcon(":/icon/trans.png"));
     ui->dictBtn->setIcon(QIcon(":/icon/dict_selected.png"));
     ui->practiceBtn->setIcon(QIcon(":/icon/practice.png"));
-    trans_timer->stop();
-    practice_timer->stop();
   });
 
 
@@ -69,8 +68,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->transBtn->setIcon(QIcon(":/icon/trans.png"));
     ui->dictBtn->setIcon(QIcon(":/icon/dict.png"));
     ui->practiceBtn->setIcon(QIcon(":/icon/practice_selected.png"));
-    trans_timer->stop();
-    practice_timer->stop();
   });
 
   /* 翻译界面 */
@@ -81,12 +78,17 @@ MainWindow::MainWindow(QWidget *parent)
   });
   //查找按钮
   connect(ui->getTransBtn,&QToolButton::clicked,[=](){
-    networkObj->dataStr="请稍候...";
+    ui->transResult->setText("请稍候...");
+    ui->transReadingBtn->setHidden(true);
+    if(IsEng(ui->transInput->toPlainText()))
+      ui->transSymbol->setText("请稍候...");
+    else
+      ui->transSymbol->setText("");
+
     QString str="http://test.cpp-homework.su29029.xyz/translate?query="+ui->transInput->toPlainText();
     QUrl url(str);
-    qDebug()<<url;
     networkObj->get(url); //发送get请求
-    trans_timer->start(500);
+    req=TRANSLATE;
   });
 
   //播音按钮
@@ -113,20 +115,12 @@ MainWindow::MainWindow(QWidget *parent)
       QString result=ui->transResult->text();
       QString input=ui->transInput->toPlainText();
 
-      // 正则表达式，判断输入内容是中文/英文
-      QRegExp reg("^[a-zA-Z\\s]+$");
-      QRegExpValidator vaildator(reg,0);
-      int pos=0;
-      QValidator::State res=vaildator.validate(input,pos);
-
-      if(QValidator::Acceptable==res){
-        // 输入内容是英文
+      if(IsEng(input)){
         for(int i=input.length();i<12;++i)
           input+=" ";
         ui->wordList->addItem(input+result);
       }else{
-        // 输入内容是中文
-        for(int i=2*result.length();i<12;++i)
+        for(int i=result.length();i<12;++i)
           result+=" ";
         ui->wordList->addItem(result+input);
       }
@@ -165,41 +159,79 @@ MainWindow::MainWindow(QWidget *parent)
   // 开始练习按钮
   connect(ui->practiceStartBtn,&QPushButton::clicked,[=](){
     ui->totalNum->setNum(ui->practiceNumSpinBox->value());
-    ui->currentNum->setNum(1);
-    ui->stackedWidget->setCurrentIndex(3);
+    ui->currentNum->setNum(0);
     ui->aRadio->setChecked(true);
-    practice_timer->start(500);
-    question_index=0;
-    my_answer_list.clear();
-    for(int i=0;i<ui->practiceNumSpinBox->value();++i){
-      answer_list.append(0);
-      question_list.append("");
-      solution_list.append("");
-    }
     ui->practiceNextBtn->setEnabled(false);
+    ui->practice_question->setText("请稍候...");
+    ui->aAnswer->setText("请稍候...");
+    ui->bAnswer->setText("请稍候...");
+    ui->cAnswer->setText("请稍候...");
+
+    my_answer_list.clear();
+    word_list.clear();
+    solution_list.clear();
+    question_list.clear();
+    id_list.clear();
+
+    while(id_list.length()<ui->practiceNumSpinBox->value()){
+      int id=qrand() % TOTAL_QUESTION_NUM+1;
+      while(id_list.contains(id))
+          id=qrand() % TOTAL_QUESTION_NUM+1;
+      id_list.append(id);
+    }
+
+    qDebug()<<id_list;
+
+    if(ui->easyRadio->isChecked())
+      difficulty="easy";
+    else if(ui->normalRadio->isChecked())
+      difficulty="normal";
+    else if(ui->hardRadio->isChecked())
+      difficulty="hard";
+
+    QString str="http://test.cpp-homework.su29029.xyz/getProblem?id="
+        +QString::number(id_list[ui->currentNum->text().toInt()])+"&difficulty="+difficulty;
+    QUrl url(str);
+    networkObj->get(url); //发送get请求
+    req=PRACTICE;
+
+    ui->stackedWidget->setCurrentIndex(3);
+    ui->practiceNextBtn->setEnabled(false);
+    ui->practiceNextBtn->setText("请稍候...");
   });
 
   /* 练习界面 */
   // 下一题按钮
   connect(ui->practiceNextBtn,&QPushButton::clicked,[=](){
+    // 填入我的答案
     if(ui->aRadio->isChecked())
-      my_answer_list.append('a');
+      my_answer_list.append('A');
     else if(ui->bRadio->isChecked())
-      my_answer_list.append('b');
+      my_answer_list.append('B');
     else if(ui->cRadio->isChecked())
-      my_answer_list.append('c');
+      my_answer_list.append('C');
 
-    ui->currentNum->setNum(ui->currentNum->text().toInt()+1);
-    ui->aRadio->setChecked(true);
+    // 切换下一题
+    if(ui->currentNum->text().toInt()<ui->totalNum->text().toInt()){
+      ui->aRadio->setChecked(true);
+      ui->practiceNextBtn->setEnabled(false);
+      ui->practiceNextBtn->setText("请稍候...");
+      ui->practice_question->setText("请稍候...");
+      ui->aAnswer->setText("请稍候...");
+      ui->bAnswer->setText("请稍候...");
+      ui->cAnswer->setText("请稍候...");
 
-    // 练习结束
-    if(ui->currentNum->text().toInt()>ui->totalNum->text().toInt()){
+      QString str="http://test.cpp-homework.su29029.xyz/getProblem?id="
+          +QString::number(id_list[ui->currentNum->text().toInt()])+"&difficulty="+difficulty;
+      QUrl url(str);
+      networkObj->get(url); //发送get请求
+    }else{
+      // 练习结束
       ui->stackedWidget->setCurrentIndex(4);
-      practice_timer->stop();
       ui->totalNumEnd->setNum(ui->practiceNumSpinBox->value());
       int error_num=0;
-      for(int i=0;i<question_index;++i)
-        if(answer_list[i]!=my_answer_list[i])
+      for(int i=0;i<question_list.length();++i)
+        if(solution_list[i]!=my_answer_list[i])
           ++error_num;
       ui->errorNumEnd->setNum(error_num);
       ui->correctRateEnd->setText(
@@ -208,22 +240,29 @@ MainWindow::MainWindow(QWidget *parent)
       ui->practiceNumSpinBox->setValue(5);
 
       // 导入题目统计到列表
-      for(int i=0;i<=question_index;++i){
+      for(int i=0;i<question_list.length();++i){
         QString question=question_list[i];
-        for(int i=question.length();i<16;++i)
-          question+=" ";
-        QString answer=solution_list[i];
-        for(int i=answer.length();i<12;++i)
-          answer+=" ";
-        if(answer_list[i]==my_answer_list[i])
-          ui->questionStatisticsList->addItem(question+answer+"正确");
+        QString answer=word_list[i];
+        QString str;
+        if(IsEng(question)){
+          for(int i=question.length();i<16;++i)
+            question+=" ";
+          for(int i=answer.length()*2;i<16;++i)
+            answer+=" ";
+          str=question+answer;
+        }else{
+          for(int i=question.length()*2;i<16;++i)
+            question+=" ";
+          for(int i=answer.length();i<16;++i)
+            answer+=" ";
+          str=answer+question;
+        }
+        if(solution_list[i]==my_answer_list[i])
+          ui->questionStatisticsList->addItem(str+"正确");
         else
-          ui->questionStatisticsList->addItem(question+answer+"错误");
+          ui->questionStatisticsList->addItem(str+"错误");
       }
     }
-
-    ++question_index;
-    ui->practiceNextBtn->setEnabled(false);
   });
 
   /* 练习结束界面 */
@@ -242,7 +281,7 @@ MainWindow::MainWindow(QWidget *parent)
       QMessageBox::warning(this,"文件打开错误","文件打开错误，请检查路径是否正确！");
     }else{
       QTextStream stream(&save_file);
-      for(int i=0;i<question_index;++i)
+      for(int i=0;i<question_list.length();++i)
         stream<<ui->questionStatisticsList->item(i)->text()<<"\n";
       save_file.close();
     }
@@ -252,6 +291,7 @@ MainWindow::MainWindow(QWidget *parent)
   ui->stackedWidget->setCurrentIndex(0);
   ui->statusbar->addPermanentWidget(
         new QLabel("Copyright © 2020 Designed by Koorye. All rights reserved.            "));
+  ui->transReadingBtn->setHidden(true);
 
   this->resize(800,600);
   this->setFixedSize(800,600);
@@ -287,26 +327,9 @@ MainWindow::MainWindow(QWidget *parent)
   connect(networkObj,SIGNAL(requestSuccessSignal(QString)),this,SLOT(requestSuccess(QString)));
   connect(networkObj,SIGNAL(requestFailSignal(QString)),this,SLOT(requestFail(QString)));
 
-  // 翻译结果同步
-  trans_timer=new QTimer(this);
-  connect(trans_timer,&QTimer::timeout,[=](){
-    qDebug()<<"翻译同步中";
-    ui->transResult->setText(networkObj->dataStr.trimmed());
-  });
-
-  // 练习题同步
-  practice_timer=new QTimer(this);
-  connect(practice_timer,&QTimer::timeout,[=](){
-    qDebug()<<"练习同步中";
-    ui->practice_question->setText("hello");
-    ui->aAnswer->setText("你好");
-    ui->bAnswer->setText("再见");
-    ui->cAnswer->setText("谢谢");
-    answer_list[question_index]='a';
-    question_list[question_index]="hello";
-    solution_list[question_index]="你好";
-    ui->practiceNextBtn->setEnabled(true);
-  });
+  QTime time;
+  time= QTime::currentTime();
+  qsrand(time.msec()+time.second()*1000);
 }
 
 MainWindow::~MainWindow(){
@@ -332,9 +355,72 @@ MainWindow::~MainWindow(){
 void MainWindow::requestFail(QString str){
   qDebug() << "----------requestFail-------------";
   qDebug() << str;
+  if(req==TRANSLATE){
+    ui->transResult->setText("访问失败，请重试");
+    ui->transSymbol->setText("");
+  }else if(req==PRACTICE){
+    QMessageBox::warning(this,"访问失败","访问失败，请重试");
+    ui->practiceNextBtn->setEnabled(true);
+    ui->practiceNextBtn->setText("下一题！");
+  }
 }
 
-void MainWindow::requestSuccess(QString str){
+void MainWindow::requestSuccess(QString res){
   qDebug() << "----------requestSuccess-------------";
-  qDebug() << str;
+  qDebug() << res;
+  if(req==TRANSLATE){
+    if(IsEng(res)){
+      ui->transResult->setText(res.trimmed());
+    }else if(req==PRACTICE){
+      ui->transReadingBtn->setHidden(false);
+      QByteArray data=res.toUtf8();
+      QJsonParseError json_error;
+      QJsonDocument jsonDoc(QJsonDocument::fromJson(data,&json_error));
+
+      if(json_error.error!=QJsonParseError::NoError){
+        ui->transResult->setText("未知错误");
+        ui->transSymbol->setText("");
+      }else{
+        QJsonObject obj=jsonDoc.object();
+        ui->transResult->setText(obj.value("res").toString());
+        ui->transSymbol->setText("英："+obj.value("ph_en").toString()
+                                 +"\n美："+obj.value("ph_am").toString());
+      }
+    }
+  }else if(req==PRACTICE){
+    QByteArray data=res.toUtf8();
+    QJsonParseError json_error;
+    QJsonDocument jsonDoc(QJsonDocument::fromJson(data,&json_error));
+
+    if(json_error.error!=QJsonParseError::NoError){
+      QMessageBox::warning(this,"未知错误","未知错误");
+    }else{
+      QJsonObject obj=jsonDoc.object();
+      ui->practice_question->setText(obj.value("question").toString());
+
+      QByteArray answer_data=obj.value("answer").toString().toUtf8();
+      QJsonDocument answer_doc(QJsonDocument::fromJson(answer_data,&json_error));
+      if(json_error.error!=QJsonParseError::NoError){
+        QMessageBox::warning(this,"解析错误","JSON格式解析错误");
+      }else{
+        QJsonObject answer=answer_doc.object();
+
+        ui->currentNum->setNum(ui->currentNum->text().toInt()+1);
+        ui->aAnswer->setText(answer.value("A").toString());
+        ui->bAnswer->setText(answer.value("B").toString());
+        ui->cAnswer->setText(answer.value("C").toString());
+        question_list.append(obj.value("question").toString());
+        solution_list.append(obj.value("solution").toString().front());
+
+        if(obj.value("solution").toString().front()=='A')
+          word_list.append(answer.value("A").toString());
+        else if(obj.value("solution").toString().front()=='B')
+          word_list.append(answer.value("B").toString());
+        else
+          word_list.append(answer.value("C").toString());
+      }
+    }
+    ui->practiceNextBtn->setEnabled(true);
+    ui->practiceNextBtn->setText("下一题！");
+  }
 }

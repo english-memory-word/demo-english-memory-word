@@ -8,6 +8,7 @@
 #include <QNetworkReply>
 #include <QDebug>
 #include <QImageReader>
+
 class NetworkSupport : public QObject
 {
   Q_OBJECT
