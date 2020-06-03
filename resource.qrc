@@ -11,5 +11,6 @@
         <file>icon/practice_selected.png</file>
         <file>icon/favor.png</file>
         <file>icon/favor_selected.png</file>
+        <file>icon.ico</file>
     </qresource>
 </RCC>

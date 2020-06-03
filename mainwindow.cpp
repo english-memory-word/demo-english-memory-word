@@ -176,7 +176,7 @@ MainWindow::MainWindow(QWidget *parent)
     while(id_list.length()<ui->practiceNumSpinBox->value()){
       int id=qrand() % TOTAL_QUESTION_NUM+1;
       while(id_list.contains(id))
-          id=qrand() % TOTAL_QUESTION_NUM+1;
+        id=qrand() % TOTAL_QUESTION_NUM+1;
       id_list.append(id);
     }
 
@@ -369,23 +369,21 @@ void MainWindow::requestSuccess(QString res){
   qDebug() << "----------requestSuccess-------------";
   qDebug() << res;
   if(req==TRANSLATE){
-    if(IsEng(res)){
-      ui->transResult->setText(res.trimmed());
-    }else if(req==PRACTICE){
-      ui->transReadingBtn->setHidden(false);
-      QByteArray data=res.toUtf8();
-      QJsonParseError json_error;
-      QJsonDocument jsonDoc(QJsonDocument::fromJson(data,&json_error));
+    ui->transReadingBtn->setHidden(false);
+    QByteArray data=res.toUtf8();
+    QJsonParseError json_error;
+    QJsonDocument jsonDoc(QJsonDocument::fromJson(data,&json_error));
 
-      if(json_error.error!=QJsonParseError::NoError){
-        ui->transResult->setText("未知错误");
-        ui->transSymbol->setText("");
-      }else{
-        QJsonObject obj=jsonDoc.object();
-        ui->transResult->setText(obj.value("res").toString());
-        ui->transSymbol->setText("英："+obj.value("ph_en").toString()
-                                 +"\n美："+obj.value("ph_am").toString());
-      }
+    if(json_error.error!=QJsonParseError::NoError){
+      // 仅返回结果
+      ui->transResult->setText(res.trimmed());
+      ui->transSymbol->setText("");
+    }else{
+      // 返回结果和音标的json
+      QJsonObject obj=jsonDoc.object();
+      ui->transResult->setText(obj.value("res").toString());
+      ui->transSymbol->setText("英："+obj.value("ph_en").toString()
+                               +"\n美："+obj.value("ph_am").toString());
     }
   }else if(req==PRACTICE){
     QByteArray data=res.toUtf8();
